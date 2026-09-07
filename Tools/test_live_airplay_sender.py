@@ -44,6 +44,66 @@ class DeviceNameMatchingTests(unittest.TestCase):
 
 
 class AlphaSafetyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_connect_failure_after_source_eof_raises(self):
+        import asyncio
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+
+        class Buffer:
+            def __init__(self):
+                self.chunks = iter([b"abc", b""])
+
+            def read(self, _size):
+                return next(self.chunks)
+
+        config = SimpleNamespace(name="Bedroom", identifier="bedroom-id")
+        with patch.object(MODULE, "scan", AsyncMock(return_value=[config])):
+            with patch.object(MODULE, "connect", AsyncMock(side_effect=OSError("offline"))):
+                with patch.object(MODULE.sys, "stdin", SimpleNamespace(buffer=Buffer())):
+                    with patch.object(sys, "argv", ["sender", "--device", "Bedroom", "--retry-delay", "0.01"]):
+                        with self.assertRaisesRegex(RuntimeError, "Audio source ended"):
+                            await asyncio.wait_for(MODULE.main(), timeout=0.25)
+
+    async def test_stream_failure_after_source_eof_raises(self):
+        import asyncio
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+
+        class Buffer:
+            def __init__(self):
+                self.chunks = iter([b"abc", b""])
+
+            def read(self, _size):
+                return next(self.chunks)
+
+        class Audio:
+            async def set_volume(self, _volume):
+                return None
+
+        class Stream:
+            async def stream_file(self, reader):
+                await asyncio.sleep(0.05)
+                await reader.read(1)
+                raise RuntimeError("stream failed")
+
+        class Player:
+            def __init__(self):
+                self.audio = Audio()
+                self.stream = Stream()
+
+            def close(self):
+                return None
+
+        config = SimpleNamespace(name="Bedroom", identifier="bedroom-id")
+        with patch.object(MODULE, "scan", AsyncMock(return_value=[config])):
+            with patch.object(MODULE, "connect", AsyncMock(return_value=Player())):
+                with patch.object(MODULE.sys, "stdin", SimpleNamespace(buffer=Buffer())):
+                    with patch.object(sys, "argv", ["sender", "--device", "Bedroom", "--retry-delay", "0.01"]):
+                        with self.assertRaisesRegex(RuntimeError, "Audio source ended"):
+                            await asyncio.wait_for(MODULE.main(), timeout=0.25)
+
     async def test_ambiguous_names_are_rejected_by_both_senders(self):
         from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch

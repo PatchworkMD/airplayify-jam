@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-alpha.2
+
+- Stop with an error when a receiver fails after the audio source ends, instead of hanging in reconnect.
+- Add regressions for connection and streaming failures at end of input.
+
 ## 0.1.0-alpha.1
 
 First public experimental binary release.

@@ -104,6 +104,7 @@ async def main() -> int:
     connection_lock = asyncio.Lock()
     capture_process = None
     capture_bytes = 0
+    source_ended = False
     if args.capture_device:
         capture_process = await asyncio.create_subprocess_exec(
             "ffmpeg", "-hide_banner", "-loglevel", "error",
@@ -118,7 +119,7 @@ async def main() -> int:
         return await asyncio.to_thread(sys.stdin.buffer.read, 64 * 1024)
 
     async def fanout() -> None:
-        nonlocal history_bytes, capture_bytes
+        nonlocal history_bytes, capture_bytes, source_ended
         received_audio = False
         while chunk := await read_chunk():
             received_audio = True
@@ -132,6 +133,7 @@ async def main() -> int:
                 history_bytes -= len(history.popleft())
             for queue in queues:
                 await queue.put(chunk)
+        source_ended = True
         for queue in queues:
             await queue.put(None)
         audio_ready.set()
@@ -181,6 +183,8 @@ async def main() -> int:
                 await asyncio.gather(streaming, feeder)
                 ended = True
             except Exception as error:  # noqa: BLE001 - device recovery boundary
+                if source_ended:
+                    raise RuntimeError(f"Audio source ended while reconnecting to {config.name}") from error
                 async with connection_lock:
                     connected_workers.discard(index)
                     write_status("starting", f"Reconnecting to {config.name}")
