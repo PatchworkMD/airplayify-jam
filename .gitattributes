@@ -1,0 +1,4 @@
+# Keep private investigation records out of public source archives.
+/docs/plans export-ignore
+/docs/superpowers export-ignore
+/security export-ignore
