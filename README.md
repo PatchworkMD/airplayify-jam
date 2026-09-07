@@ -1,29 +1,25 @@
 # Airplayify Jam
 
-Experimental macOS menu-bar app for grouping visible audio outputs for Spotify playback. It does not modify Tutti.app; Spotify access and refresh tokens are stored only in Keychain.
+An experimental macOS menu-bar app for grouping audio outputs for Spotify playback.
 
-Desktop OAuth uses Authorization Code with PKCE, so the app needs only a Spotify
-client ID. Never paste or ship a Spotify client secret; if one is exposed, revoke
-it in the Spotify dashboard and create a replacement only for a server-side
-confidential client.
+[Website](https://patchworkmd.dev/airplayify/) · [Download alpha.2](https://github.com/PatchworkMD/airplayify-jam/releases/tag/v0.1.0-alpha.2) · [Installation guide](INSTALL.md) · [Report a bug](https://github.com/PatchworkMD/airplayify-jam/issues)
 
-The current sender adapter uses the open-source `pyatv` library to discover and stream to AirPlay receivers independently. This is deliberate: macOS Core Audio exposes the Roku endpoints as one `AirPlay` device, while Bonjour/pyatv can see `50in Hisense Roku TV` and `Roku Express 4K` separately.
+## Try the alpha
 
-## Distribution status
+The current download is **0.1.0-alpha.2** for **Apple Silicon Macs running macOS 14 or later**. It includes the app, installer, and setup instructions. Python/pyatv and FFmpeg are installed separately by the setup workflow; BlackHole is optional.
 
-Airplayify Jam is MIT-licensed alpha software, published on GitHub.
-A Mac App Store build is planned. The current build uses an external
-Python/pyatv runtime and FFmpeg; it is not an App Store package.
+**Experimental release:** the app is ad-hoc signed and not notarized, so Gatekeeper may block it. Automated checks cover output planning, Party lifecycle, sender behavior, and installation policy. Real-device playback, synchronization, output restoration, and visual interaction checks remain pending. This is not a Mac App Store build.
 
-Automated checks cover output planning, Party lifecycle, sender behavior, and
-installation policy. Audible playback, synchronization, cleanup, and restoration
-still need verification on the target devices.
+## What it does
 
-For source releases, use `git archive`. Archive attributes exclude private
-investigation notes and historical security reports. The private repository
-history is not part of the public source snapshot.
+- Save an Output group and manage a Party from the menu bar.
+- Discover local audio outputs and AirPlay receivers.
+- Use in-app volume controls, with optional global volume keys in the direct build.
+- Configure optional Spotify Connect lanes. Separate lanes do not promise synchronized playback.
 
-## Run
+AirPlay streaming uses the open-source `pyatv` library. Spotify Connect uses Authorization Code with PKCE; access and refresh tokens are stored in Keychain. The app needs a Spotify client ID, never a client secret.
+
+## Build from source
 
 ```sh
 ./scripts/build.sh
@@ -102,8 +98,8 @@ restrictions.
 
 The persistent **Permissions & Setup** window reports whether Screen & System
 Audio Recording is allowed and opens the exact macOS privacy pane when it is
-not. macOS owns this permission and keeps it enabled until the user turns it
-off. The same window detects BlackHole 2ch as an optional virtual Audio MIDI
+not. macOS owns this permission; a changed app signature or rebuild may require
+renewed approval or an app restart. The same window detects BlackHole 2ch as an optional virtual Audio MIDI
 loopback output and provides its installer or Homebrew command. Airplayify Jam
 does not silently install a system audio driver; its default ScreenCaptureKit
 party path works without one.
@@ -113,7 +109,7 @@ Two native macOS switches apply immediately and persist between launches:
 when that driver is present, while **Automatically refresh available outputs**
 controls the five-second output inventory monitor.
 
-The app bundle contains only sender scripts and `requirements.txt`; `.venv`,
+The app bundle includes the capture helper, sender scripts, and `requirements.txt`; `.venv`,
 `.env`, tokens, and credentials are excluded.
 
 The app discovers Core Audio outputs and saves an `Everywhere` group. Output
@@ -127,7 +123,7 @@ separate authenticated account lanes. Playback lifecycle, output reconciliation,
 and Spotify lane policy live behind their respective modules rather than in the
 menu view.
 
-## Local verification and private shipping
+## Development checks and local packaging
 
 The Store policy build uses in-app volume sliders and excludes global volume-key
 takeover and its Accessibility prompt. Verify this policy with:
@@ -155,7 +151,7 @@ snapshot without launching or installing the app:
 ./scripts/test-isolated.sh
 ```
 
-Build and package a private local copy for Austin only:
+Build and package a local development copy:
 
 ```sh
 ./scripts/package-private.sh
