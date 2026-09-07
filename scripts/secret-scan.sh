@@ -8,10 +8,11 @@ pattern='(client_secret[[:space:]]*[:=][[:space:]]*["'"'][^"'"']+["'"']|client s
 status=0
 
 scan_current() {
-  git grep -IlE "$pattern" -- . ':!security/secret-scan-*' >/tmp/airplayify-secret-scan-current 2>/dev/null || true
-  if [[ -s /tmp/airplayify-secret-scan-current ]]; then
+  local matches
+  matches=$(git grep -IlE "$pattern" -- . ':!security/secret-scan-*' 2>/dev/null || true)
+  if [[ -n "$matches" ]]; then
     echo "Potential credential pattern in tracked files:"
-    sed 's#^#  #' /tmp/airplayify-secret-scan-current
+    sed 's#^#  #' <<<"$matches"
     status=1
   fi
 }
@@ -34,7 +35,6 @@ done
 
 scan_current
 scan_history
-rm -f /tmp/airplayify-secret-scan-current
 
 if [[ "$status" -ne 0 ]]; then
   echo "Secret scan failed. Remove the material from the repository and rotate it."

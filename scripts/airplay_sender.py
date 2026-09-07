@@ -28,6 +28,9 @@ async def find_devices(names: list[str], timeout: int):
     requested = {normalize_device_name(name): name.strip() for name in names}
     wanted = set(requested)
     selected = [device for device in devices if normalize_device_name(device.name) in wanted]
+    for name in wanted:
+        if sum(normalize_device_name(device.name) == name for device in selected) > 1:
+            raise RuntimeError(f"Ambiguous AirPlay receiver name: {requested[name]}. Rename the receivers before starting.")
     missing = sorted(requested[name] for name in wanted - {normalize_device_name(device.name) for device in selected})
     if missing:
         raise RuntimeError(f"AirPlay devices not found: {', '.join(missing)}")

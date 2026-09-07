@@ -34,9 +34,40 @@ def match_requested_devices(discovered, device_names: list[str]):
     requested = {normalize_device_name(name): name.strip() for name in device_names}
     wanted = set(requested)
     configs = [device for device in discovered if normalize_device_name(device.name) in wanted]
+    for name in wanted:
+        if sum(normalize_device_name(device.name) == name for device in configs) > 1:
+            raise RuntimeError(f"Ambiguous AirPlay receiver name: {requested[name]}. Rename the receivers before starting.")
     found = {normalize_device_name(device.name) for device in configs}
     missing = sorted(requested[name] for name in wanted - found)
     return configs, missing
+
+
+class ReaderFlowControl(asyncio.Transport):
+    """Connect manual StreamReader feeding to its public backpressure API."""
+
+    def __init__(self):
+        super().__init__()
+        self.ready = asyncio.Event()
+        self.ready.set()
+
+    def pause_reading(self):
+        self.ready.clear()
+
+    def resume_reading(self):
+        self.ready.set()
+
+    def is_reading(self):
+        return self.ready.is_set()
+
+
+async def feed_audio(queue, reader, flow):
+    while True:
+        await asyncio.wait_for(flow.ready.wait(), timeout=5)
+        chunk = await queue.get()
+        if chunk is None:
+            reader.feed_eof()
+            return
+        reader.feed_data(chunk)
 
 
 async def main() -> int:
@@ -65,7 +96,7 @@ async def main() -> int:
         print(json.dumps({"receivers": [device.name.strip() for device in configs]}))
         return 0
 
-    queues = [asyncio.Queue() for _ in configs]
+    queues = [asyncio.Queue(maxsize=8) for _ in configs]
     history: deque[bytes] = deque()
     history_bytes = 0
     audio_ready = asyncio.Event()
@@ -118,23 +149,16 @@ async def main() -> int:
         ended = False
         first_attempt = True
         while not ended:
-            reader = asyncio.StreamReader()
+            reader = asyncio.StreamReader(limit=128 * 1024)
+            flow = ReaderFlowControl()
+            reader.set_transport(flow)
             if not first_attempt:
                 for chunk in history:
                     reader.feed_data(chunk)
             first_attempt = False
 
-            async def feed_reader() -> None:
-                nonlocal ended
-                while True:
-                    chunk = await queue.get()
-                    if chunk is None:
-                        ended = True
-                        reader.feed_eof()
-                        return
-                    reader.feed_data(chunk)
-
-            feeder = asyncio.create_task(feed_reader())
+            feeder = asyncio.create_task(feed_audio(queue, reader, flow))
+            streaming = None
             player = None
             try:
                 player = await connect(config, loop)
@@ -153,27 +177,36 @@ async def main() -> int:
                     await player.audio.set_volume(max(0, min(requested_volume, 100)))
                 except Exception as volume_error:  # receiver may not expose volume
                     print(f"{config.name}: volume unavailable ({type(volume_error).__name__})", file=sys.stderr)
-                await player.stream.stream_file(reader)
-                await feeder
+                streaming = asyncio.create_task(player.stream.stream_file(reader))
+                await asyncio.gather(streaming, feeder)
+                ended = True
             except Exception as error:  # noqa: BLE001 - device recovery boundary
+                async with connection_lock:
+                    connected_workers.discard(index)
+                    write_status("starting", f"Reconnecting to {config.name}")
                 print(f"{config.name}: reconnecting after {type(error).__name__}", file=sys.stderr)
-                feeder.cancel()
-                if ended:
+                if reader.at_eof():
                     return
                 await asyncio.sleep(args.retry_delay)
             finally:
+                pending = [task for task in (feeder, streaming) if task is not None]
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
                 if player is not None:
                     player.close()
 
+    tasks = [
+        asyncio.create_task(fanout()),
+        *(asyncio.create_task(worker(index, config, queue))
+          for index, (config, queue) in enumerate(zip(configs, queues))),
+    ]
     try:
-        await asyncio.gather(
-            fanout(),
-            *(worker(index, config, queue) for index, (config, queue) in enumerate(zip(configs, queues))),
-        )
+        await asyncio.gather(*tasks)
     finally:
-        for queue in queues:
-            if queue.empty():
-                await queue.put(None)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         if capture_process is not None and capture_process.returncode is None:
             capture_process.terminate()
     print(f"streamed stdin to {len(configs)} AirPlay devices")

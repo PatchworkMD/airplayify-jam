@@ -31,7 +31,9 @@ CLANG_MODULE_CACHE_PATH=${CLANG_MODULE_CACHE_PATH:-"$ROOT/.build/ModuleCache"}
 SWIFT_MODULE_CACHE_PATH=${SWIFT_MODULE_CACHE_PATH:-"$CLANG_MODULE_CACHE_PATH"}
 export CLANG_MODULE_CACHE_PATH SWIFT_MODULE_CACHE_PATH
 mkdir -p "$CLANG_MODULE_CACHE_PATH"
-swiftc "$@" -O \
+DEPLOYMENT_TARGET=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$ROOT/Resources/Info.plist")
+TARGET="$(uname -m)-apple-macos$DEPLOYMENT_TARGET"
+swiftc "$@" -target "$TARGET" -O \
   -framework CryptoKit \
   -framework Security \
   -framework AppKit \
@@ -40,7 +42,7 @@ swiftc "$@" -O \
   -framework CoreGraphics \
   -o "$OUT" \
   "$ROOT"/Sources/AirplayifyJam/*.swift
-swiftc -O -parse-as-library \
+swiftc -target "$TARGET" -O -parse-as-library \
   -framework Foundation \
   -framework CoreMedia \
   -framework ScreenCaptureKit \

@@ -5,6 +5,7 @@ import Combine
 @main
 struct AirplayifyJamApp: App {
     @StateObject private var controller: JamController
+    @State private var menuBarInserted = true
     private let setupPresenter: SetupWindowPresenter
 
     init() {
@@ -33,7 +34,7 @@ struct AirplayifyJamApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Airplayify Jam", systemImage: "airplayaudio") {
+        MenuBarExtra("Airplayify Jam", systemImage: "airplayaudio", isInserted: $menuBarInserted) {
             JamControlCenterView(controller: controller, setupPresenter: setupPresenter)
         }
         .menuBarExtraStyle(.window)

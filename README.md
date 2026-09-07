@@ -1,6 +1,6 @@
 # Airplayify Jam
 
-Private-first macOS menu-bar prototype for grouping visible audio outputs for Spotify playback. It does not modify Tutti.app; Spotify access and refresh tokens are stored only in Keychain.
+Experimental macOS menu-bar app for grouping visible audio outputs for Spotify playback. It does not modify Tutti.app; Spotify access and refresh tokens are stored only in Keychain.
 
 Desktop OAuth uses Authorization Code with PKCE, so the app needs only a Spotify
 client ID. Never paste or ship a Spotify client secret; if one is exposed, revoke
@@ -11,8 +11,8 @@ The current sender adapter uses the open-source `pyatv` library to discover and 
 
 ## Distribution status
 
-Airplayify Jam is MIT-licensed pre-release software. Open-source GitHub distribution
-and a Mac App Store build are planned. The current build uses an external
+Airplayify Jam is MIT-licensed alpha software, published on GitHub.
+A Mac App Store build is planned. The current build uses an external
 Python/pyatv runtime and FFmpeg; it is not an App Store package.
 
 Automated checks cover output planning, Party lifecycle, sender behavior, and
@@ -170,3 +170,7 @@ macOS can preserve Screen & System Audio Recording approval across rebuilds.
 Set `AIRPLAYIFY_SIGNING_IDENTITY` to choose a different identity. The build
 falls back to ad-hoc signing only when no development identity is installed;
 that fallback can make macOS request permission again after each changed build.
+
+## Support
+
+Contact [hello@patchworkmd.dev](mailto:hello@patchworkmd.dev) or visit [PatchworkMD](https://patchworkmd.dev). For reproducible bugs, use this repository’s GitHub Issues and omit tokens and private logs.
